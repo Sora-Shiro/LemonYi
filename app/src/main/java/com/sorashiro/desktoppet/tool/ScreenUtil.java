@@ -21,7 +21,6 @@ import android.view.WindowManager;
 
 public class ScreenUtil {
 
-    //获取屏幕宽度
     public static int getScreenWidth(Context context) {
         WindowManager mWindowManager =
                 (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -30,7 +29,6 @@ public class ScreenUtil {
         return point.x;
     }
 
-    //获取屏幕高度
     public static int getScreenHeight(Context context) {
         WindowManager mWindowManager =
                 (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -39,12 +37,6 @@ public class ScreenUtil {
         return point.y;
     }
 
-
-    /**
-     * 获取状态栏高度(px)
-     *
-     * @return 状态栏高度px
-     */
     public static int getStatusBarHeight(Context context) {
         Resources resources = context.getResources();
         int resourceId = resources.getIdentifier("status_bar_height", "dimen", "android");

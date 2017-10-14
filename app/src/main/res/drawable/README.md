@@ -1,1 +1,0 @@
-**Notice**: If you want to use tianyi_XX.png, which is in ```drawable``` folder, please contact with [@铮了个粽子](https://www.weibo.com/u/5242737926) and [@一千块西瓜冰-打算退博](https://www.weibo.com/imlittled).

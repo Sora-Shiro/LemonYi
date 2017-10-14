@@ -1142,7 +1142,7 @@ public class PetView extends View {
     private void startFallToStandUpAnimation() {
         final WindowManager.LayoutParams layoutParams = (
                 WindowManager.LayoutParams) getLayoutParams();
-        final long duration = 2500;
+        final long duration = 1300;
         mObjectAnimator = ObjectAnimator.ofInt(
                 this, "Top",
                 0, 0);
@@ -1154,7 +1154,7 @@ public class PetView extends View {
                 float rate = ((float) animation.getCurrentPlayTime()) /
                         ((float) duration);
                 // This is how gif work
-                if (rate < 0.4) {
+                if (rate < 0.23) {
                     setStatus(FALL_2);
                 } else if (rate <= 1) {
                     setStatus(FALL_3);
