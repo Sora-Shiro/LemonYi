@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Lemon Yi</string>
+    <string name="generate_lemonyi">Generate Lemon Yi</string>
+    <string name="byebye_lemonyi">Bye bye Lemon Yi</string>
+    <string name="about_this_app">About this APP</string>
+    <string name="too_much_lemonyi">Too many Lemon Yi!</string>
+    <string name="carefully">Too many Lemon Yi will make system SLOWLY ;)</string>
+    <string name="v1_0">Lemon Yi v1.0</string>
+    <string name="character_design">Character Design\n@铮了个粽子</string>
+    <string name="windows_ver">Windows Ver（Original）\n@一千块西瓜冰-打算退博</string>
+    <string name="android_ver">Android Ver\nSora Shiro</string>
+    <string name="github">GitHub\ngithub.com/Sora-Shiro</string>
+</resources>

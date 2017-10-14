@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">柠檬依</string>
+    <string name="generate_lemonyi">生成柠檬依</string>
+    <string name="byebye_lemonyi">拜拜柠檬依</string>
+    <string name="about_this_app">关于本 APP</string>
+    <string name="too_much_lemonyi">太多柠檬依啦!</string>
+    <string name="carefully">太多的柠檬依会让系统很卡哦！</string>
+    <string name="v1_0">柠檬依 v1.0</string>
+    <string name="character_design">人设\n@铮了个粽子</string>
+    <string name="windows_ver">Windows 版本（原版）\n@一千块西瓜冰-打算退博</string>
+    <string name="android_ver">Android 版本\nSora Shiro</string>
+    <string name="github">GitHub\ngithub.com/Sora-Shiro</string>
+</resources>
