@@ -80,9 +80,9 @@ public class ViewManager implements PetView.PetViewEvent {
         params.gravity = Gravity.TOP | Gravity.START;
         if(Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.O) {
             // TODO: What should I do if it's Android O?
-            params.type = WindowManager.LayoutParams.TYPE_PHONE;
-        } else if (Build.VERSION.SDK_INT > 24) {
-            // Android 7.1.1 == API25, which need to use other type
+            params.type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR;
+        } else if (Build.VERSION.SDK_INT >= 24) {
+            // Android 7.0 == API24, which need to use other type
             params.type = WindowManager.LayoutParams.TYPE_PHONE;
         } else {
             params.type = WindowManager.LayoutParams.TYPE_TOAST;
