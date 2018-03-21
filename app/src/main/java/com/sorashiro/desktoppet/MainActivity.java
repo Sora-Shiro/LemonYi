@@ -37,9 +37,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void initView() {
-        btnGenerate = (Button) findViewById(R.id.btnGenerate);
-        btnRemove = (Button) findViewById(R.id.btnRemove);
-        btnAbout = (Button) findViewById(R.id.btnAbout);
+        btnGenerate = findViewById(R.id.btnGenerate);
+        btnRemove = findViewById(R.id.btnRemove);
+        btnAbout = findViewById(R.id.btnAbout);
 
         btnGenerate.setOnClickListener(this);
         btnRemove.setOnClickListener(this);

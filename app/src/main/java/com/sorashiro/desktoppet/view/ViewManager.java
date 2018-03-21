@@ -78,8 +78,8 @@ public class ViewManager implements PetView.PetViewEvent {
         params.width = petView.getInitWidth();
         params.height = petView.getInitHeight();
         params.gravity = Gravity.TOP | Gravity.START;
-        if(Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.O) {
-            // Android 8.0 == API26
+        if(Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            // Android 8.0 == API26, Android 8.1 same
             params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         } else if (Build.VERSION.SDK_INT >= 24) {
             // Android 7.0 == API24, which need to use other type
@@ -154,8 +154,12 @@ public class ViewManager implements PetView.PetViewEvent {
                         mVelocityTracker.addMovement(event);
                         float x = event.getRawX() - startX;
                         float y = event.getRawY() - startY;
-                        params.x += x;
-                        params.y += y;
+                        // Magic Formula!! With this, Pet will never be far away from finger
+                        // when you move your finger fastly!!
+                        params.x = (int) (event.getRawX()) - 160;
+                        params.y = (int) (event.getRawY()) - 190;
+//                        params.x += x;
+//                        params.y += y;
                         if (petView.checkHitYBorder(false)) {
                             // Use VelocityTracker to check swing
                             mVelocityTracker.computeCurrentVelocity(1000, mMaxVelocity);

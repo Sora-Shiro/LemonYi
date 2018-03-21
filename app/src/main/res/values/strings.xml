@@ -5,9 +5,10 @@
     <string name="about_this_app">关于本 APP</string>
     <string name="too_much_lemonyi">太多柠檬依啦!</string>
     <string name="carefully">太多的柠檬依会让系统很卡哦！</string>
-    <string name="v1_0">柠檬依 v1.0</string>
+    <string name="version_code">柠檬依 v1.1</string>
     <string name="character_design">人设\n@铮了个粽子</string>
     <string name="windows_ver">Windows 版本（原版）\n@一千块西瓜冰-打算退博</string>
     <string name="android_ver">Android 版本\nSora Shiro</string>
     <string name="github">GitHub\ngithub.com/Sora-Shiro</string>
+    <string name="update_log">更新日志\n2018/03/22 v1.1\n- 来回快速滑动天依会使天依逐渐远离手指，修复了它！（部分机型可能仍会有该现象）\n- 更新对 Android 8.1 的支持 w\n2017/10/14 v1.0\n- 本 APP 诞生！</string>
 </resources>

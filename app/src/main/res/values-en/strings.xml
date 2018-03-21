@@ -5,9 +5,10 @@
     <string name="about_this_app">About this APP</string>
     <string name="too_much_lemonyi">Too many Lemon Yi!</string>
     <string name="carefully">Too many Lemon Yi will make system SLOWLY ;)</string>
-    <string name="v1_0">Lemon Yi v1.0</string>
+    <string name="version_code">Lemon Yi v1.1</string>
     <string name="character_design">Character Design\n@铮了个粽子</string>
     <string name="windows_ver">Windows Ver（Original）\n@一千块西瓜冰-打算退博</string>
     <string name="android_ver">Android Ver\nSora Shiro</string>
     <string name="github">GitHub\ngithub.com/Sora-Shiro</string>
+    <string name="update_log">Update Log\n2018/03/22 v1.1\n- If you move Tianyi quickly, she will be far away from your finger gradually, and it\'s fixed now!（some mobile may not）\n- Add Android 8.1 supported. w\n2017/10/14 v1.0\n- Now we have LemonYi！</string>
 </resources>
