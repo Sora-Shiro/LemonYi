@@ -14,36 +14,63 @@
 
 package com.sorashiro.desktoppet.view;
 
-import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
-import android.view.VelocityTracker;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
 import com.sorashiro.desktoppet.R;
+import com.sorashiro.desktoppet.tool.DPUtil;
 import com.sorashiro.desktoppet.tool.LogAndToastUtil;
 import com.sorashiro.desktoppet.tool.ScreenUtil;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
-public class ViewManager implements PetView.PetViewEvent {
+/**
+ * 管理唯一的全屏 {@link PetCanvasView} 浮窗，以及每只宠物对应的触摸代理窗口。
+ *
+ * <h3>架构说明</h3>
+ * <ul>
+ *   <li><b>Canvas 层（渲染）</b>：MATCH_PARENT 全屏透明覆盖层，
+ *       设置 {@code FLAG_NOT_TOUCHABLE}，不接收任何触摸事件，
+ *       所有宠物的绘制通过 {@code invalidate()} 完成，零 IPC 开销。</li>
+ *   <li><b>Touch Proxy 层（输入）</b>：每只宠物对应一个 100×100 dp 透明 View，
+ *       大小等于宠物，设置 {@code FLAG_NOT_TOUCH_MODAL}；
+ *       宠物区域外的触摸自动透传给底层窗口（如桌面/其他 App），
+ *       宠物区域内的触摸委托给 {@link PetCanvasView#handleProxyTouch}。</li>
+ * </ul>
+ *
+ * <h3>性能</h3>
+ * Touch proxy 位置通过 {@code WindowManager.updateViewLayout()} 更新，
+ * 但 proxy View 本身透明无绘制内容，成本远低于原来的 PetView（含 Bitmap 绘制）。
+ */
+public class ViewManager {
 
     private static ViewManager instance = null;
 
-    private WindowManager                         mWindowManager;
-    private Context                               mContext;
-    private ArrayList<PetView>                    mPetViews;
-    private ArrayList<WindowManager.LayoutParams> mLayoutParams;
+    private final WindowManager mWindowManager;
+    private final Context       mContext;
+
+    /** 唯一的全屏 Canvas 覆盖层；首次 showPetView() 时懒创建。 */
+    private PetCanvasView mCanvasView;
+
+    /** 每只宠物对应的透明触摸代理 View（100×100 dp，FLAG_NOT_TOUCH_MODAL）。 */
+    private final Map<PetModel, View>                          mTouchProxies = new HashMap<>();
+    private final Map<PetModel, WindowManager.LayoutParams>    mTouchParams  = new HashMap<>();
+
+    private int mPetWidth;
+    private int mPetHeight;
 
     private ViewManager(Context context) {
-        mContext = context;
-        init();
+        mContext       = context;
+        mWindowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        mPetWidth  = DPUtil.dip2px(context, 100);
+        mPetHeight = DPUtil.dip2px(context, 100);
     }
 
     public static ViewManager getInstance(Context context) {
@@ -57,240 +84,166 @@ public class ViewManager implements PetView.PetViewEvent {
         return instance;
     }
 
-    private void init() {
-        mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
-        mPetViews = new ArrayList<>();
-        mLayoutParams = new ArrayList<>();
-    }
+    // ── 内部辅助 ─────────────────────────────────────────────────────────
 
+    /** 确保全屏 Canvas 覆盖层已添加到 WindowManager。 */
+    private void ensureCanvasView() {
+        if (mCanvasView != null) return;
 
-    public void showPetView() {
-        if (mPetViews.size() >= 11) {
-            LogAndToastUtil.ToastOut(mContext, mContext.getString(R.string.too_much_lemonyi));
-            return;
-        } else if(mPetViews.size() == 1) {
-            LogAndToastUtil.ToastOut(mContext, mContext.getString(R.string.carefully));
-        }
+        mCanvasView = new PetCanvasView(mContext);
 
-        final PetView petView = new PetView(mContext);
-
-        final WindowManager.LayoutParams params = new WindowManager.LayoutParams();
-        params.width = petView.getInitWidth();
-        params.height = petView.getInitHeight();
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams();
+        params.width   = WindowManager.LayoutParams.MATCH_PARENT;
+        params.height  = WindowManager.LayoutParams.MATCH_PARENT;
         params.gravity = Gravity.TOP | Gravity.START;
-        if(Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            // Android 8.0 == API26, Android 8.1 same
-            params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else if (Build.VERSION.SDK_INT >= 24) {
-            // Android 7.0 == API24, which need to use other type
-            params.type = WindowManager.LayoutParams.TYPE_PHONE;
-        } else {
-            params.type = WindowManager.LayoutParams.TYPE_TOAST;
-        }
+        params.type    = overlayType();
+        // FLAG_NOT_TOUCHABLE：canvas 只负责渲染，不接收任何触摸事件
+        params.flags   = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+        params.format  = PixelFormat.RGBA_8888;
 
-        // FLAG_LAYOUT_NO_LIMITS
-        // Window flag: allow window to extend outside of the screen.
-        // window大小不再不受手机屏幕大小限制，即window可能超出屏幕之外，这时部分内容在屏幕之外。
-        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-        params.format = PixelFormat.RGBA_8888;
-        // Fall down begin
-        params.y = -ScreenUtil.getStatusBarHeight(mContext) - petView.getInitHeight();
-        // Random fall down pet
-        Random random = new Random();
-        int seed = ScreenUtil.getScreenWidth(mContext) - petView.getInitHeight();
-        seed = seed < 0 ? 0 : seed;
-        int rX = random.nextInt(seed);
-        params.x = rX;
-        petView.setIsLeft(random.nextBoolean());
+        mWindowManager.addView(mCanvasView, params);
 
-        View.OnTouchListener onTouchListener = new View.OnTouchListener() {
-
-            float startX;
-            float startY;
-            float tempX;
-            float tempY;
-
-            // Acceleration
-            VelocityTracker mVelocityTracker;
-            int mMaxVelocity = ViewConfiguration.get(mContext).getScaledMaximumFlingVelocity();
-            int mPointerId;
-
-            private void releaseVelocityTracker() {
-                if (null != mVelocityTracker) {
-                    mVelocityTracker.clear();
-                    mVelocityTracker.recycle();
-                    mVelocityTracker = null;
-                }
-            }
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                PetView view = (PetView) v;
-                // Struggle will make the current finger be invalid,
-                // and ACTION_DOWN can reset it
-                if(event.getAction() == MotionEvent.ACTION_DOWN) {
-                    view.setCanTouched(true);
-                }
-                if(!view.isCanTouched()) {
-                    return true;
-                }
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        mPointerId = event.getPointerId(0);
-                        mVelocityTracker = VelocityTracker.obtain();
-                        petView.setLegBehavior(true);
-                        ObjectAnimator animator = view.getObjectAnimator();
-                        if (animator != null) {
-                            animator.cancel();
-                        }
-                        startX = event.getRawX();
-                        startY = event.getRawY();
-                        tempX = event.getRawX();
-                        tempY = event.getRawY();
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        mVelocityTracker.addMovement(event);
-                        float x = event.getRawX() - startX;
-                        float y = event.getRawY() - startY;
-                        // Magic Formula!! With this, Pet will never be far away from finger
-                        // when you move your finger fastly!!
-                        params.x = (int) (event.getRawX()) - 160;
-                        params.y = (int) (event.getRawY()) - 190;
-//                        params.x += x;
-//                        params.y += y;
-                        if (petView.checkHitYBorder(false)) {
-                            // Use VelocityTracker to check swing
-                            mVelocityTracker.computeCurrentVelocity(1000, mMaxVelocity);
-                            float velocityX = mVelocityTracker.getXVelocity(mPointerId);
-                            if (velocityX > 500) {
-                                petView.setStatus(PetView.SWING_LEFT);
-                            } else if (velocityX < -500) {
-                                petView.setStatus(PetView.SWING_RIGHT);
-                            } else {
-                                if (petView.getStatus() == PetView.SWING_LEFT) {
-                                    petView.setStatus(PetView.SWING_LEFT_BACK);
-                                    petView.sendMyDelayMessage(PetView.DRAG, PetView.CHANGE_CHECK, 500);
-                                } else if (petView.getStatus() == PetView.SWING_RIGHT) {
-                                    petView.setStatus(PetView.SWING_RIGHT_BACK);
-                                    petView.sendMyDelayMessage(PetView.DRAG, PetView.CHANGE_CHECK, 500);
-                                } else if (petView.getStatus() != PetView.SWING_LEFT_BACK &&
-                                        petView.getStatus() != PetView.SWING_RIGHT_BACK) {
-                                    petView.setStatus(PetView.DRAG);
-                                }
-                            }
-                        }
-                        mWindowManager.updateViewLayout(petView, params);
-                        startX = event.getRawX();
-                        startY = event.getRawY();
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        float endX = event.getRawX();
-                        float endY = event.getRawY();
-                        if (petView.checkHitYBorder(true)) {
-                            // Acc Check
-                            if (params.y > ScreenUtil.getScreenHeight(mContext) - view.getInitHeight() - ScreenUtil.getStatusBarHeight(mContext)) {
-                                petView.setStatus(PetView.SINK);
-                            } else {
-                                mVelocityTracker.computeCurrentVelocity(1000, mMaxVelocity);
-                                float velocityX = mVelocityTracker.getXVelocity(mPointerId);
-                                float velocityY = mVelocityTracker.getYVelocity(mPointerId);
-                                if (Math.abs(velocityX) > 100 || velocityY > 100) {
-                                    petView.setIsLeft(velocityX < 0);
-                                    if (velocityY > -6000 && velocityY < 0) {
-                                        velocityY = -6000;
-                                    }
-                                    petView.setStatus(PetView.FALL_1_ACC, velocityX, velocityY);
-                                } else {
-                                    petView.setStatus(PetView.FALL_1);
-                                }
-                            }
-                        }
-                        mWindowManager.updateViewLayout(petView, params);
-                        // If delta-distance greater than 6, then return true, or give event
-                        // to OnClickListener
-                        if (Math.abs(endX - tempX) > 6 && Math.abs(endY - tempY) > 6) {
-                            return true;
-                        }
-
-                        releaseVelocityTracker();
-                        break;
-                    case MotionEvent.ACTION_CANCEL:
-                        releaseVelocityTracker();
-
-                        break;
-                }
-                return false;
-            }
-        };
-
-        View.OnClickListener onClickListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-            }
-        };
-
-
-        petView.setOnTouchListener(onTouchListener);
-        petView.setOnClickListener(onClickListener);
-        petView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                petView.setAttached(true);
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-                petView.setAttached(false);
+        // 每帧 onDraw 回调：同步所有 touch proxy 窗口位置
+        mCanvasView.setPositionChangedCallback(() -> {
+            for (PetModel m : mCanvasView.getModels()) {
+                updateTouchProxy(m);
             }
         });
 
-        petView.setStatus(PetView.FALL_1);
-        petView.setPetViewEvent(ViewManager.this);
-        mWindowManager.addView(petView, params);
-
-        mPetViews.add(petView);
-        mLayoutParams.add(params);
-
+        // 宠物内部被移除（如 SINK 动画结束）时同步清理 touch proxy
+        mCanvasView.setOnModelRemovedListener(model -> removeTouchProxy(model));
     }
 
-    public void removeAllPetView() {
-        while (true) {
-            if (mPetViews.size() == 0) {
-                break;
-            }
-            removePetView(0);
+    /** 移除 Canvas 覆盖层并清空引用。 */
+    private void destroyCanvasView() {
+        if (mCanvasView != null) {
+            mCanvasView.setPositionChangedCallback(null);
+            mCanvasView.setOnModelRemovedListener(null);
+            mWindowManager.removeViewImmediate(mCanvasView);
+            mCanvasView = null;
         }
     }
 
+    /** 返回当前 API 对应的 overlay window type。 */
+    private int overlayType() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        } else if (Build.VERSION.SDK_INT >= 24) {
+            return WindowManager.LayoutParams.TYPE_PHONE;
+        } else {
+            return WindowManager.LayoutParams.TYPE_TOAST;
+        }
+    }
 
-    public void removePetView(int index) {
-        if (mPetViews.size() == 0) {
+    /** 为 model 添加 touch proxy 窗口（100×100 dp 透明 View）。 */
+    private void addTouchProxy(final PetModel model) {
+        View proxy = new View(mContext) {
+            @Override
+            public boolean onTouchEvent(MotionEvent event) {
+                return mCanvasView != null && mCanvasView.handleProxyTouch(model, event);
+            }
+        };
+
+        WindowManager.LayoutParams p = new WindowManager.LayoutParams();
+        p.width   = mPetWidth;
+        p.height  = mPetHeight;
+        p.x       = model.x;
+        p.y       = model.y;
+        p.gravity = Gravity.TOP | Gravity.START;
+        p.type    = overlayType();
+        p.flags   = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+        p.format  = PixelFormat.TRANSPARENT;
+
+        mWindowManager.addView(proxy, p);
+        mTouchProxies.put(model, proxy);
+        mTouchParams.put(model, p);
+    }
+
+    /** 更新 model 对应 touch proxy 窗口的位置。 */
+    private void updateTouchProxy(PetModel model) {
+        // 拖拽中不移动 proxy：若 proxy 随 model 移动，event.getX()/getY() 会
+        // 相对于新窗口原点重算，导致 VelocityTracker 速度失真，甩出动画无法正确触发。
+        if (mCanvasView != null && mCanvasView.isDragging(model)) return;
+        View proxy = mTouchProxies.get(model);
+        WindowManager.LayoutParams p = mTouchParams.get(model);
+        if (proxy == null || p == null) return;
+        if (p.x == model.x && p.y == model.y) return; // 无变化则跳过 IPC
+        p.x = model.x;
+        p.y = model.y;
+        mWindowManager.updateViewLayout(proxy, p);
+    }
+
+    /** 移除 model 对应的 touch proxy 窗口。 */
+    private void removeTouchProxy(PetModel model) {
+        View proxy = mTouchProxies.remove(model);
+        mTouchParams.remove(model);
+        if (proxy != null) {
+            mWindowManager.removeViewImmediate(proxy);
+        }
+    }
+
+    /** 移除所有 touch proxy 窗口。 */
+    private void removeAllTouchProxies() {
+        for (View proxy : mTouchProxies.values()) {
+            mWindowManager.removeViewImmediate(proxy);
+        }
+        mTouchProxies.clear();
+        mTouchParams.clear();
+    }
+
+    // ── 公开 API ─────────────────────────────────────────────────────────
+
+    /** 生成一只新宠物，从屏幕顶部随机位置落下。 */
+    public void showPetView() {
+        int count = (mCanvasView != null) ? mCanvasView.getModels().size() : 0;
+        if (count >= 11) {
+            LogAndToastUtil.ToastOut(mContext, mContext.getString(R.string.too_much_lemonyi));
             return;
         }
-        PetView petView = mPetViews.get(index);
-        ObjectAnimator objectAnimator = petView.getObjectAnimator();
-        if (objectAnimator != null) {
-            objectAnimator.cancel();
+        if (count == 1) {
+            LogAndToastUtil.ToastOut(mContext, mContext.getString(R.string.carefully));
         }
-        mWindowManager.removeViewImmediate(petView);
-        mPetViews.remove(index);
-        mLayoutParams.remove(index);
+
+        ensureCanvasView();
+
+        int seed = ScreenUtil.getScreenWidth(mContext) - mPetWidth;
+        seed = seed < 0 ? 0 : seed;
+
+        Random random = new Random();
+        int startX = random.nextInt(seed);
+        int startY = -ScreenUtil.getStatusBarHeight(mContext) - mPetHeight;
+
+        PetModel model = mCanvasView.addPet(startX, startY, random.nextBoolean());
+        addTouchProxy(model);
     }
 
-
-    @Override
-    public void reDraw(PetView petView, WindowManager.LayoutParams layoutParams) {
-        if (petView.isAttached()) {
-            mWindowManager.updateViewLayout(petView, layoutParams);
+    /** 移除所有宠物并销毁覆盖层。 */
+    public void removeAllPetView() {
+        removeAllTouchProxies();
+        if (mCanvasView != null) {
+            mCanvasView.removeAll();
+            destroyCanvasView();
         }
     }
 
-    @Override
-    public void removePet(PetView petView) {
-        int index = mPetViews.indexOf(petView);
-        removePetView(index);
-    }
+    /**
+     * 按索引移除单只宠物。
+     * 若移除后已无宠物，则顺带销毁覆盖层以释放资源。
+     */
+    public void removePetView(int index) {
+        if (mCanvasView == null || mCanvasView.getModels().isEmpty()) return;
+        if (index < 0 || index >= mCanvasView.getModels().size()) return;
 
+        PetModel model = mCanvasView.getModels().get(index);
+        removeTouchProxy(model);
+        mCanvasView.removeModel(model);
+
+        if (mCanvasView.getModels().isEmpty()) {
+            destroyCanvasView();
+        }
+    }
 }

@@ -15,11 +15,11 @@
 package com.sorashiro.desktoppet;
 
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 
 import com.sorashiro.desktoppet.permission.FloatWindowManager;
 
@@ -32,6 +32,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Android 15 (API 35) enforces edge-to-edge by default for apps targeting SDK 35,
+        // causing the window to extend behind the status bar and nav bar.
+        // Opt back in to the classic "decor fits system windows" behavior so the
+        // content area starts below the status bar as expected.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(true);
+        }
         setContentView(R.layout.activity_main);
         initView();
     }

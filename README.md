@@ -3,7 +3,7 @@
 [![](https://img.shields.io/badge/release-1.0-red.svg)]()
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue.svg)]()
 
-**[Download LemonYi_v1.1](https://github.com/Sora-Shiro/LemonYi/raw/master/extra/LemonYi_v1.1.apk)**
+**[Download LemonYi_v1.2](https://github.com/Sora-Shiro/LemonYi/raw/master/extra/LemonYi_v1.2.apk)**
 
 Character Design : [@铮了个粽子](https://www.weibo.com/u/5242737926)
 
